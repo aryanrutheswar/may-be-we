@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   TouchableOpacity,
   KeyboardAvoidingView,
@@ -9,14 +10,10 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, RADII, FONTS, SHADOWS, PALETTE } from '../../lib/theme';
-import PrimaryButton from '../../components/ui/PrimaryButton';
-import InputField from '../../components/ui/InputField';
 import { useAuth } from '../../lib/authContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
 
@@ -38,7 +35,7 @@ export default function ResetPasswordScreen() {
 
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      document.title = 'Set New Password — MaybeWe';
+      document.title = 'Set a new password — May Be We';
     }
 
     let isMounted = true;
@@ -123,8 +120,9 @@ export default function ResetPasswordScreen() {
 
         // Verify active Supabase session
         if (isSupabaseConfigured) {
-          const { data: { session: currentSession } } =
-            await supabase.auth.getSession();
+          const {
+            data: { session: currentSession },
+          } = await supabase.auth.getSession();
           if (isMounted) {
             if (currentSession?.user) {
               setHasValidSession(true);
@@ -166,13 +164,13 @@ export default function ResetPasswordScreen() {
       return;
     }
 
-    if (trimmedPassword.length < 6) {
-      setErrorMessage('Password must be at least 6 characters long.');
+    if (trimmedPassword.length < 8) {
+      setErrorMessage('Password must be at least 8 characters.');
       return;
     }
 
     if (trimmedPassword !== trimmedConfirm) {
-      setErrorMessage('Passwords do not match. Please verify and try again.');
+      setErrorMessage('Both passwords must match.');
       return;
     }
 
@@ -213,6 +211,10 @@ export default function ResetPasswordScreen() {
     router.replace('/(auth)/login');
   };
 
+  const handleRequestNewLink = () => {
+    router.replace('/(auth)/forgot-password');
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -223,239 +225,188 @@ export default function ResetPasswordScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 },
+          {
+            paddingTop: Math.max(insets.top + 20, 48),
+            paddingBottom: Math.max(insets.bottom + 24, 40),
+          },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Top Bar with Brand Badge */}
-          <View style={styles.topBar}>
-            <TouchableOpacity
-              onPress={handleNavigateToLogin}
-              style={styles.backButton}
-              accessibilityRole="button"
-              accessibilityLabel="Back to sign in"
-            >
-              <Ionicons name="chevron-back" size={24} color="#0F172A" />
-            </TouchableOpacity>
+        {/* Brand Logo / Title Header */}
+        <Text style={styles.brandTitle}>May Be We</Text>
 
-            <View style={styles.brandBadge}>
-              <Ionicons name="airplane" size={14} color={COLORS.lavender} style={{ marginRight: 6 }} />
-              <Text style={styles.brandBadgeText}>MAYBEWE</Text>
+        {/* Card Container */}
+        <View style={styles.card}>
+          {checkingSession ? (
+            /* Loading State */
+            <View style={styles.stateWrapper}>
+              <ActivityIndicator size="large" color="#2563EB" style={{ marginBottom: 16 }} />
+              <Text style={styles.stateTitle}>Verifying reset link...</Text>
+              <Text style={styles.stateSubtitle}>Please wait a moment.</Text>
             </View>
+          ) : urlError ? (
+            /* Expired / Invalid URL Error */
+            <View style={styles.stateWrapper}>
+              <Ionicons name="alert-circle-outline" size={44} color="#DC2626" style={{ marginBottom: 12 }} />
+              <Text style={styles.stateTitle}>Link Expired</Text>
+              <Text style={styles.stateSubtitle}>{urlError}</Text>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={handleRequestNewLink}
+                accessibilityRole="button"
+              >
+                <Text style={styles.primaryButtonText}>Request a new reset email</Text>
+              </TouchableOpacity>
+            </View>
+          ) : !hasValidSession && !session?.user ? (
+            /* Session expired or direct access without token */
+            <View style={styles.stateWrapper}>
+              <Ionicons name="key-outline" size={44} color="#D97706" style={{ marginBottom: 12 }} />
+              <Text style={styles.stateTitle}>Session Expired</Text>
+              <Text style={styles.stateSubtitle}>
+                This password reset link is invalid or has expired.
+              </Text>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={handleRequestNewLink}
+                accessibilityRole="button"
+              >
+                <Text style={styles.primaryButtonText}>Request a new reset email</Text>
+              </TouchableOpacity>
+            </View>
+          ) : isSuccess ? (
+            /* Password Reset Success Card */
+            <View style={styles.stateWrapper}>
+              <Ionicons name="checkmark-circle-outline" size={48} color="#16A34A" style={{ marginBottom: 12 }} />
+              <Text style={styles.stateTitle}>Password Updated</Text>
+              <Text style={styles.stateSubtitle}>
+                Your password has been changed successfully. You can now log in with your new password.
+              </Text>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={handleNavigateToLogin}
+                accessibilityRole="button"
+              >
+                <Text style={styles.primaryButtonText}>Log in with new password</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            /* Form matching design */
+            <>
+              <Text style={styles.cardHeading}>Set a new password</Text>
+              <Text style={styles.cardSubtitle}>
+                Choose a password you have not used before. This link works once and expires soon.
+              </Text>
 
-            <View style={{ width: 44 }} />
-          </View>
-
-          {/* Card Container */}
-          <View style={styles.cardContainer}>
-            {checkingSession ? (
-              /* Session Verification Loading State */
-              <View style={styles.glassFormCard}>
-                <View style={styles.loadingWrapper}>
-                  <ActivityIndicator size="large" color={COLORS.sunset} style={{ marginBottom: 16 }} />
-                  <Text style={styles.loadingTitle}>Verifying Security Token</Text>
-                  <Text style={styles.loadingSubtitle}>
-                    Connecting to your recovery session securely...
-                  </Text>
-                </View>
-              </View>
-            ) : urlError ? (
-              /* URL / Link Expired Error Card */
-              <View style={styles.glassFormCard}>
-                <View style={styles.errorIconWrapper}>
-                  <LinearGradient
-                    colors={['rgba(239, 68, 68, 0.25)', 'rgba(220, 38, 38, 0.10)']}
-                    style={styles.errorIconBadge}
-                  >
-                    <Ionicons name="alert-circle-outline" size={36} color="#EF4444" />
-                  </LinearGradient>
-                </View>
-
-                <Text style={styles.errorCardTitle}>Invalid or Expired Link</Text>
-                <Text style={styles.errorCardMessage}>{urlError}</Text>
-                <Text style={styles.errorCardHint}>
-                  Password reset links are single-use and expire for your security. Please request a fresh reset link.
-                </Text>
-
-                <PrimaryButton
-                  title="Request New Reset Link"
-                  onPress={() => router.replace('/(auth)/forgot-password')}
-                  size="lg"
-                  style={styles.actionCTA}
-                />
-
-                <TouchableOpacity
-                  onPress={handleNavigateToLogin}
-                  style={styles.secondaryActionBtn}
-                  accessibilityRole="button"
-                  accessibilityLabel="Back to Sign In"
-                >
-                  <Text style={styles.secondaryActionText}>Back to Sign In</Text>
-                </TouchableOpacity>
-              </View>
-            ) : !hasValidSession && !session?.user ? (
-              /* No Active Recovery Session Found */
-              <View style={styles.glassFormCard}>
-                <View style={styles.errorIconWrapper}>
-                  <LinearGradient
-                    colors={['rgba(245, 158, 11, 0.25)', 'rgba(217, 119, 6, 0.10)']}
-                    style={styles.errorIconBadge}
-                  >
-                    <Ionicons name="key-outline" size={36} color="#F59E0B" />
-                  </LinearGradient>
-                </View>
-
-                <Text style={styles.errorCardTitle}>Recovery Session Expired</Text>
-                <Text style={styles.errorCardMessage}>
-                  No active password recovery session was detected. Please open the link directly from your reset email or request a new one.
-                </Text>
-
-                <PrimaryButton
-                  title="Request Reset Link"
-                  onPress={() => router.replace('/(auth)/forgot-password')}
-                  size="lg"
-                  style={styles.actionCTA}
-                />
-
-                <TouchableOpacity
-                  onPress={handleNavigateToLogin}
-                  style={styles.secondaryActionBtn}
-                  accessibilityRole="button"
-                  accessibilityLabel="Back to Sign In"
-                >
-                  <Text style={styles.secondaryActionText}>Back to Sign In</Text>
-                </TouchableOpacity>
-              </View>
-            ) : !isSuccess ? (
-              /* Reset Password Form */
-              <>
-                <View style={styles.headingSection}>
-                  <Text style={styles.headingTitle}>Create New Password</Text>
-                  <Text style={styles.headingSubtitle}>
-                    Choose a strong, unique password for your MaybeWe account.
-                  </Text>
-                </View>
-
-                <View style={styles.glassFormCard}>
-                  {/* New Password Field */}
-                  <View style={styles.inputWrapper}>
-                    <InputField
-                      label="New Password"
-                      placeholder="At least 6 characters"
-                      icon="lock-closed-outline"
-                      secureTextEntry={!showPassword}
-                      value={newPassword}
-                      onChangeText={(text) => {
-                        setNewPassword(text);
-                        if (errorMessage) setErrorMessage('');
-                      }}
-                      returnKeyType="next"
-                    />
-                    <TouchableOpacity
-                      onPress={() => setShowPassword(!showPassword)}
-                      style={styles.eyeToggle}
-                      accessibilityRole="button"
-                      accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      <Ionicons
-                        name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                        size={20}
-                        color="rgba(255, 255, 255, 0.60)"
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Confirm Password Field */}
-                  <View style={styles.inputWrapper}>
-                    <InputField
-                      label="Confirm Password"
-                      placeholder="Repeat your new password"
-                      icon="lock-closed-outline"
-                      secureTextEntry={!showConfirmPassword}
-                      value={confirmPassword}
-                      onChangeText={(text) => {
-                        setConfirmPassword(text);
-                        if (errorMessage) setErrorMessage('');
-                      }}
-                      returnKeyType="done"
-                      onSubmitEditing={handleUpdatePassword}
-                    />
-                    <TouchableOpacity
-                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                      style={styles.eyeToggle}
-                      accessibilityRole="button"
-                      accessibilityLabel={showConfirmPassword ? 'Hide password' : 'Show password'}
-                    >
-                      <Ionicons
-                        name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
-                        size={20}
-                        color="rgba(255, 255, 255, 0.60)"
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Error Box */}
-                  {errorMessage ? (
-                    <View style={styles.errorBox}>
-                      <Ionicons
-                        name="alert-circle"
-                        size={16}
-                        color={COLORS.danger}
-                        style={{ marginRight: 8 }}
-                      />
-                      <Text style={styles.errorText}>{errorMessage}</Text>
-                    </View>
-                  ) : null}
-
-                  {/* Submit CTA */}
-                  <PrimaryButton
-                    title="Reset Password"
-                    loading={loading}
-                    disabled={loading}
-                    onPress={handleUpdatePassword}
-                    size="lg"
-                    style={styles.actionCTA}
+              {/* New Password Field */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>New password</Text>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="At least 8 characters"
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={!showPassword}
+                    value={newPassword}
+                    onChangeText={(text) => {
+                      setNewPassword(text);
+                      if (errorMessage) setErrorMessage('');
+                    }}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="next"
                   />
-
-                  <View style={styles.backPromptRow}>
-                    <TouchableOpacity
-                      onPress={handleNavigateToLogin}
-                      accessibilityRole="button"
-                      accessibilityLabel="Cancel and return to Sign In"
-                    >
-                      <Text style={styles.backPromptLink}>Cancel and Return to Sign In</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </>
-            ) : (
-              /* Success Confirmation Card */
-              <View style={styles.glassFormCard}>
-                <View style={styles.successIconWrapper}>
-                  <LinearGradient
-                    colors={['rgba(52, 211, 153, 0.25)', 'rgba(16, 185, 129, 0.10)']}
-                    style={styles.successIconBadge}
+                  <TouchableOpacity
+                    style={styles.visibilityToggle}
+                    onPress={() => setShowPassword(!showPassword)}
+                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    <Ionicons name="checkmark-circle-outline" size={38} color="#34D399" />
-                  </LinearGradient>
+                    <Ionicons
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color="#6B7280"
+                    />
+                  </TouchableOpacity>
                 </View>
-
-                <Text style={styles.successTitle}>Password Reset Successfully!</Text>
-                <Text style={styles.successMessage}>
-                  Your password has been updated. You can now sign in to your MaybeWe account using your new password.
-                </Text>
-
-                <PrimaryButton
-                  title="Sign In to MaybeWe"
-                  onPress={handleNavigateToLogin}
-                  size="lg"
-                  style={styles.actionCTA}
-                />
               </View>
-            )}
-          </View>
-        </ScrollView>
+
+              {/* Confirm Password Field */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Confirm new password</Text>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Type it again"
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={!showConfirmPassword}
+                    value={confirmPassword}
+                    onChangeText={(text) => {
+                      setConfirmPassword(text);
+                      if (errorMessage) setErrorMessage('');
+                    }}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    onSubmitEditing={handleUpdatePassword}
+                  />
+                  <TouchableOpacity
+                    style={styles.visibilityToggle}
+                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                    accessibilityLabel={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  >
+                    <Ionicons
+                      name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color="#6B7280"
+                    />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.helperText}>Both passwords must match.</Text>
+              </View>
+
+              {/* Inline Error Message */}
+              {errorMessage ? (
+                <View style={styles.errorAlert}>
+                  <Ionicons name="alert-circle" size={16} color="#DC2626" style={{ marginRight: 6 }} />
+                  <Text style={styles.errorAlertText}>{errorMessage}</Text>
+                </View>
+              ) : null}
+
+              {/* Update Password Button */}
+              <TouchableOpacity
+                style={[styles.primaryButton, loading && styles.buttonDisabled]}
+                onPress={handleUpdatePassword}
+                disabled={loading}
+                accessibilityRole="button"
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Update password</Text>
+                )}
+              </TouchableOpacity>
+
+              {/* Card Footer: Request new reset email */}
+              <View style={styles.cardFooter}>
+                <Text style={styles.footerText}>Link expired? </Text>
+                <TouchableOpacity onPress={handleRequestNewLink}>
+                  <Text style={styles.footerLink}>Request a new reset email</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
+
+        {/* Back to Login Link Below Card */}
+        <TouchableOpacity
+          onPress={handleNavigateToLogin}
+          style={styles.backToLoginWrapper}
+          accessibilityRole="button"
+        >
+          <Text style={styles.backToLoginLink}>Back to login</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -463,221 +414,174 @@ export default function ResetPasswordScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F7F6F2',
-  },
-  bg: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
-  bgImage: {
-    width: '100%',
-    height: '100%',
+    backgroundColor: '#F8F9FA',
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 22,
-    alignItems: 'center',
-  },
-  topBar: {
-    width: '100%',
-    maxWidth: 440,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: RADII.sm,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D9D8D3',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 20,
   },
-  brandBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: RADII.sm,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D9D8D3',
+  brandTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 28,
+    letterSpacing: -0.2,
   },
-  brandBadgeText: {
-    fontFamily: FONTS.bold,
-    fontSize: 11,
-    color: '#171716',
-    letterSpacing: 2.0,
-  },
-  cardContainer: {
+  card: {
     width: '100%',
-    maxWidth: 440,
-    flex: 1,
-    justifyContent: 'center',
-    paddingBottom: 24,
+    maxWidth: 480,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 36,
+    paddingVertical: 36,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+      },
+      default: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 2,
+      },
+    }),
   },
-  headingSection: {
+  cardHeading: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+    letterSpacing: -0.4,
+  },
+  cardSubtitle: {
+    fontSize: 14.5,
+    lineHeight: 21,
+    color: '#4B5563',
     marginBottom: 24,
   },
-  headingTitle: {
-    fontFamily: FONTS.extraBold,
-    fontSize: 32,
-    color: '#171716',
-    letterSpacing: -0.6,
+  fieldGroup: {
+    marginBottom: 18,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
     marginBottom: 8,
   },
-  headingSubtitle: {
-    fontFamily: FONTS.regular,
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#363633',
-  },
-  glassFormCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: RADII.xl,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#D9D8D3',
-    ...SHADOWS.subtle,
-  },
-  inputWrapper: {
-    position: 'relative',
-    width: '100%',
-  },
-  eyeToggle: {
-    position: 'absolute',
-    right: 14,
-    top: 38,
-    padding: 6,
-    zIndex: 10,
-  },
-  errorBox: {
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(220, 38, 38, 0.12)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: RADII.md,
     borderWidth: 1,
-    borderColor: 'rgba(220, 38, 38, 0.25)',
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    height: 46,
+    paddingHorizontal: 14,
+  },
+  input: {
+    flex: 1,
+    height: '100%',
+    fontSize: 15,
+    color: '#111827',
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      },
+    }),
+  },
+  visibilityToggle: {
+    padding: 6,
+    marginLeft: 4,
+  },
+  helperText: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 6,
+  },
+  errorAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
     marginBottom: 16,
   },
-  errorText: {
-    fontFamily: FONTS.medium,
+  errorAlertText: {
     fontSize: 13,
     color: '#DC2626',
     flex: 1,
+    fontWeight: '500',
   },
-  actionCTA: {
+  primaryButton: {
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 8,
-    marginBottom: 16,
+    width: '100%',
   },
-  backPromptRow: {
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  primaryButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  cardFooter: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 6,
+    marginTop: 24,
+    flexWrap: 'wrap',
   },
-  backPromptLink: {
-    fontFamily: FONTS.medium,
+  footerText: {
+    fontSize: 13.5,
+    color: '#6B7280',
+  },
+  footerLink: {
+    fontSize: 13.5,
+    color: '#2563EB',
+    fontWeight: '500',
+  },
+  backToLoginWrapper: {
+    marginTop: 22,
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  backToLoginLink: {
     fontSize: 14,
-    color: '#0F172A',
+    color: '#2563EB',
+    fontWeight: '500',
     textDecorationLine: 'underline',
   },
-  loadingWrapper: {
+  stateWrapper: {
     alignItems: 'center',
-    paddingVertical: 32,
-  },
-  loadingTitle: {
-    fontFamily: FONTS.bold,
-    fontSize: 18,
-    color: '#0F172A',
-    marginBottom: 8,
-  },
-  loadingSubtitle: {
-    fontFamily: FONTS.regular,
-    fontSize: 14,
-    color: '#475569',
+    paddingVertical: 12,
     textAlign: 'center',
   },
-  errorIconWrapper: {
-    alignItems: 'center',
-    marginVertical: 12,
-  },
-  errorIconBadge: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(220, 38, 38, 0.35)',
-    backgroundColor: 'rgba(220, 38, 38, 0.10)',
-  },
-  errorCardTitle: {
-    fontFamily: FONTS.bold,
-    fontSize: 22,
-    color: '#0F172A',
-    textAlign: 'center',
-    marginTop: 12,
+  stateTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
     marginBottom: 8,
+    textAlign: 'center',
   },
-  errorCardMessage: {
-    fontFamily: FONTS.regular,
+  stateSubtitle: {
     fontSize: 14,
-    color: '#475569',
+    color: '#4B5563',
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 8,
-  },
-  errorCardHint: {
-    fontFamily: FONTS.regular,
-    fontSize: 13,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 18,
     marginBottom: 20,
-  },
-  secondaryActionBtn: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  secondaryActionText: {
-    fontFamily: FONTS.medium,
-    fontSize: 14,
-    color: '#0F172A',
-    textDecorationLine: 'underline',
-  },
-  successIconWrapper: {
-    alignItems: 'center',
-    marginVertical: 12,
-  },
-  successIconBadge: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(5, 150, 105, 0.35)',
-    backgroundColor: 'rgba(5, 150, 105, 0.10)',
-  },
-  successTitle: {
-    fontFamily: FONTS.bold,
-    fontSize: 22,
-    color: '#0F172A',
-    textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  successMessage: {
-    fontFamily: FONTS.regular,
-    fontSize: 15,
-    color: '#475569',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
   },
 });

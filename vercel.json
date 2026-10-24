@@ -1,0 +1,22 @@
+{
+  "buildCommand": "expo export --platform web",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/health", "destination": "/api/health" },
+    { "source": "/validate-selfie", "destination": "/api/validate-selfie" },
+    { "source": "/api/health", "destination": "/api/health" },
+    { "source": "/api/validate-selfie", "destination": "/api/validate-selfie" },
+    { "source": "/api", "destination": "/api/index" },
+    { "source": "/((?!api|health|validate-selfie|_expo|assets|favicon.ico).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Headers", "value": "authorization, x-client-info, apikey, content-type" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS, PUT, DELETE" }
+      ]
+    }
+  ]
+}

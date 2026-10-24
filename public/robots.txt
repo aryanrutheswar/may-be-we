@@ -1,0 +1,10 @@
+# robots.txt for MaybeWe Solo Traveler Matching Platform
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /backend/
+Disallow: /_expo/
+
+# Host & Sitemap
+Host: https://maybewe.com
+Sitemap: https://maybewe.com/sitemap.xml

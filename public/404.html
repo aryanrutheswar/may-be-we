@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Destination Not Found (404) — MaybeWe</title>
+  <meta name="description" content="The travel destination or coordinates you requested could not be located on MaybeWe." />
+  <meta name="robots" content="noindex, follow" />
+  <link rel="icon" href="/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: radial-gradient(circle at 50% 25%, #FBFAF7 0%, #F1EEE6 45%, #E5D8C8 100%);
+      color: #171817;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .card {
+      background: #FFFDFC;
+      border: 1px solid #EDE5DA;
+      border-radius: 28px;
+      padding: 48px 36px;
+      max-width: 460px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(23, 24, 23, 0.08), 0 1px 3px rgba(0,0,0,0.02);
+    }
+    .badge {
+      display: inline-block;
+      background: #F5EEE5;
+      color: #756345;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 6px 14px;
+      border-radius: 999px;
+      margin-bottom: 24px;
+    }
+    .compass-icon {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 20px;
+      color: #B99A5E;
+    }
+    h1 {
+      font-size: 26px;
+      font-weight: 800;
+      color: #171817;
+      letter-spacing: -0.6px;
+      margin-bottom: 12px;
+      line-height: 1.25;
+    }
+    p {
+      font-size: 15px;
+      color: #77766F;
+      line-height: 1.55;
+      margin-bottom: 32px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #171817;
+      color: #FFFDFC;
+      font-size: 15px;
+      font-weight: 700;
+      text-decoration: none;
+      padding: 14px 28px;
+      border-radius: 999px;
+      width: 100%;
+      max-width: 280px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 14px rgba(23, 24, 23, 0.15);
+    }
+    .btn:hover {
+      background: #2E2F2B;
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      color: #756345;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      margin-top: 14px;
+      padding: 8px 16px;
+      transition: color 0.2s ease;
+    }
+    .btn-secondary:hover {
+      color: #171817;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="badge">MAYBEWE • 404</div>
+    <svg class="compass-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" fill="#E7D3B5" stroke="#756345"></polygon>
+    </svg>
+    <h1>Destination Not Found</h1>
+    <p>The travel coordinates or page you requested could not be located. Let's get you back on the right path.</p>
+    <div>
+      <a href="/" class="btn">Return to Sanctuary</a>
+    </div>
+    <div>
+      <a href="/discovery" class="btn-secondary">Explore Indian Destinations →</a>
+    </div>
+  </main>
+</body>
+</html>

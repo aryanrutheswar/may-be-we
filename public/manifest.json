@@ -1,0 +1,23 @@
+{
+  "name": "MaybeWe — Solo Traveler Matching",
+  "short_name": "MaybeWe",
+  "description": "Curated solo traveler matching and trip discovery across India with verified connections and smart itineraries.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFDFC",
+  "theme_color": "#171817",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["travel", "social", "lifestyle"]
+}

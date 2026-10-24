@@ -1,0 +1,37 @@
+# MaybeWe — Solo Traveler Matching & Curated Trip Discovery Platform
+
+> MaybeWe is India's dedicated solo traveler matching and trip discovery platform. It pairs solo explorers heading to the same destinations across India during overlapping travel dates, supported by biometric on-device trust verification, mutual safety barriers, curated local place discovery, and collaborative hangout planning.
+
+## Core Capabilities
+
+- **Curated Solo Traveler Matching**: Date-overlap algorithm pairing travelers heading to top Indian destinations (Goa, Manali, Jaipur, Kashmir, Kerala, Ladakh, Varanasi, Udaipur, and beyond) with compatibility scoring.
+- **Biometric Trust & Safety**: On-device face verification using MediaPipe BlazeFace / ML Kit. Never stores or leaks biometrics to third-party clouds.
+- **In-Chat Safety Scanner**: Automatic client-side detection of sensitive information (unsolicited phone numbers, external handles, links) to safeguard travelers before trust is established.
+- **Trip Planner Plus & INR Budget Intelligence**: Day-by-day itinerary planning with scheduling conflict detection, automated daily budget allocations in Indian Rupees (₹), and affordable alternatives.
+- **Place Discovery**: 13 curated categories (Cafes, Restaurants, Stays, Activities, Attractions, Experiences, Adventure, Culture, Luxury, Photography, Nature, Nightlife, Shopping) localized for India.
+- **Hangout Planning & Group Circles**: Collaborative meetups with smart place suggestions, member voting, and seamless export into trip itineraries.
+- **Real-Time Travel Presence**: Mutual-opt-in temporary live location sharing with precise vs approximate privacy modes and automatic time expirations.
+
+## Key Public Routes
+
+- `/`: Primary application hub, trip discovery feed, and travel companion suggestions.
+- `/discovery`: Curated destination guides, trending spots, and hidden gems across India.
+- `/trips`: Trip planner, day-by-day scheduling, packing checklist, and INR expense tracker.
+- `/matches`: Verified travel connections, pending requests, and hangout groups.
+- `/guidelines`: Community safety principles, verification rules, and conduct policies.
+- `/welcome`: Introduction to MaybeWe community and onboarding.
+- `/signup`: Verified traveler registration for adults 18+.
+- `/login`: Secure authentication portal.
+
+## Community & Safety Standards
+
+- **Verified Identity**: All active connections require a verified selfie check.
+- **Zero Self-Verification**: Trust decisions are cryptographically enforced and cannot be manipulated from the client.
+- **Mutual Safety Barrier**: Blocking any user instantly creates a bilateral barrier across chat, location, and discovery.
+
+## Technology Stack
+
+- **Client**: Expo (React Native Web & Mobile), Expo Router, Manrope Typography.
+- **Design System**: Warm Champagne Pearl (`#FFFDFC`, `#E7D3B5`, `#171817`, `#756345`).
+- **Backend & Database**: Supabase (PostgreSQL, Row Level Security, Realtime Publications).
+- **Deployment**: Vercel Serverless & Global Edge CDN.

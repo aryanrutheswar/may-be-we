@@ -79,23 +79,21 @@ export default function VerificationScreen() {
     }
   }, [profile?.needsProfileRepair, profile?.name, profile?.age]);
 
+  // Selfie verification disabled - automatically verify and forward to main app
+  useEffect(() => {
+    if (instantVerify) {
+      instantVerify().catch(() => {});
+    }
+    const timer = setTimeout(() => {
+      router.replace('/(tabs)');
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Sync with user's stored status on mount
   useEffect(() => {
-    const isDemo = process.env.EXPO_PUBLIC_VERIFICATION_MODE === 'demo';
-    if (profile?.verification_status === 'verified') {
-      setVerificationState('VERIFIED');
-    } else if (profile?.verification_status === 'pending') {
-      if (isDemo) {
-        setVerificationState('VERIFIED');
-      } else {
-        setVerificationState('PENDING');
-      }
-    } else if (profile?.verification_status === 'failed' || profile?.verification_status === 'rejected') {
-      setVerificationState('FAILED');
-    } else {
-      setVerificationState('NOT_STARTED');
-    }
-  }, [profile?.verification_status]);
+    setVerificationState('VERIFIED');
+  }, []);
 
   const stopWebcam = () => {
     if (mediaStreamRef.current) {

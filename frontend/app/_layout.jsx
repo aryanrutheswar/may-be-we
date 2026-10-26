@@ -44,28 +44,21 @@ function AuthRouteGuard({ children }) {
       return;
     }
 
-    const isVerified = profile?.verification_status === 'verified';
+    // Selfie verification disabled: all authenticated users are granted access once guidelines are accepted
+    const isVerified = true;
     const isAuthenticated = Boolean(user || session?.user || profile?.id);
 
     console.log('[AuthGuard] route:', segments.join('/'), 'isAuthenticated:', isAuthenticated, 'isVerified:', isVerified, 'hasAgreedToGuidelines:', hasAgreedToGuidelines);
 
     if (isAuthenticated) {
       // User is logged in
-      if (!isVerified) {
-        // Unverified user MUST agree to guidelines then complete selfie verification before entering tabs
-        if (!hasAgreedToGuidelines) {
-          if (currentSubRoute !== 'guidelines') {
-            console.log('[AuthGuard] Unverified user needs guidelines -> Redirecting to /(auth)/guidelines');
-            router.replace('/(auth)/guidelines');
-          }
-        } else {
-          if (currentSubRoute !== 'verification') {
-            console.log('[AuthGuard] Unverified user with guidelines agreed -> Redirecting to /(auth)/verification');
-            router.replace('/(auth)/verification');
-          }
+      if (!hasAgreedToGuidelines) {
+        if (currentSubRoute !== 'guidelines') {
+          console.log('[AuthGuard] User needs guidelines -> Redirecting to /(auth)/guidelines');
+          router.replace('/(auth)/guidelines');
         }
       } else {
-        // Verified user: redirect directly from any auth screen to tabs
+        // Redirect directly from any auth screen (including verification) to tabs
         const isAuthScreen =
           currentSubRoute === 'welcome' ||
           currentSubRoute === 'login' ||
@@ -76,7 +69,7 @@ function AuthRouteGuard({ children }) {
           currentSubRoute === 'verification';
 
         if (inAuthGroup && isAuthScreen) {
-          console.log('[AuthGuard] Verified user on auth screen -> Redirecting to /(tabs)');
+          console.log('[AuthGuard] Authenticated user on auth screen -> Redirecting to /(tabs)');
           router.replace('/(tabs)');
         }
       }

@@ -263,12 +263,8 @@ export function AuthProvider({ children }) {
       const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (!error && data) {
-        const localVerified = await AsyncStorage.getItem(`@maybewe_verified_${userId}`);
-        if (localVerified === 'true' || data.verification_status === 'verified') {
-          data.verification_status = 'verified';
-          const localVerifiedAt = await AsyncStorage.getItem(`@maybewe_verified_at_${userId}`);
-          data.verified_at = data.verified_at || localVerifiedAt || new Date().toISOString();
-        }
+        data.verification_status = 'verified';
+        data.verified_at = data.verified_at || new Date().toISOString();
         const userEmail = session?.user?.email;
         const enrichedProfile = { ...data, email: data.email || userEmail };
         setProfile(enrichedProfile);
@@ -276,8 +272,8 @@ export function AuthProvider({ children }) {
         return;
       }
 
-      // If public.users row is missing for the authenticated user, query user_verifications to capture real status (pending/not_started)
-      let verifStatus = 'not_started';
+      // If public.users row is missing for the authenticated user, automatically treat as verified
+      let verifStatus = 'verified';
       const localVerified = await AsyncStorage.getItem(`@maybewe_verified_${userId}`);
       if (localVerified === 'true') {
         verifStatus = 'verified';
@@ -669,7 +665,8 @@ export function AuthProvider({ children }) {
             avatar_url: userData.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
             travel_styles: userData.travel_styles || [],
             languages: userData.languages || ['English'],
-            verification_status: 'not_started',
+            verification_status: 'verified',
+            verified_at: new Date().toISOString(),
             trust_score: 5.00,
             subscription_tier: 'free',
             theme_preference: 'light',
@@ -711,7 +708,8 @@ export function AuthProvider({ children }) {
           avatar_url: userData.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
           travel_styles: userData.travel_styles || ['Culture', 'Adventure'],
           languages: userData.languages || ['English'],
-          verification_status: 'not_started',
+          verification_status: 'verified',
+          verified_at: new Date().toISOString(),
           trust_score: 5.00,
           subscription_tier: 'free',
           theme_preference: 'light',

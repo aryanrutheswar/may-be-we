@@ -53,19 +53,20 @@ export default function GuidelinesScreen() {
   });
 
   const insets = useSafeAreaInsets();
-  const { session, user, profile, agreeToGuidelines } = useAuth();
+  const { session, user, profile, agreeToGuidelines, instantVerify } = useAuth();
 
   const [loading, setLoading] = useState(false);
 
   const handleAgree = async () => {
     setLoading(true);
     await agreeToGuidelines();
-    console.log('[Guidelines] session immediately before navigation to verification:', {
-      hasSession: !!session,
-      userId: session?.user?.id || user?.id || profile?.id || 'NONE',
-    });
+    if (instantVerify) {
+      try {
+        await instantVerify();
+      } catch {}
+    }
     setLoading(false);
-    router.push('/(auth)/verification');
+    router.replace('/(tabs)');
   };
 
   return (

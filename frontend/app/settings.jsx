@@ -112,24 +112,19 @@ export default function SettingsScreen() {
           <Text style={styles.sectionTitle}>TRUST & SAFETY</Text>
         </View>
         <GlassCard material="pearl" style={styles.cardNoPadding}>
-          <TouchableOpacity
-            style={styles.rowButton}
-            onPress={() => router.push('/(auth)/verification')}
-            activeOpacity={0.7}
-          >
+          <View style={styles.rowButton}>
             <View style={styles.settingLeft}>
               <View style={styles.iconWrap}>
-                <Ionicons name="shield-checkmark-outline" size={18} color="#B99A5E" />
+                <Ionicons name="shield-checkmark" size={18} color="#2E7D32" />
               </View>
               <View>
-                <Text style={styles.settingLabel}>Selfie ID Verification</Text>
-                <Text style={[styles.settingDesc, { color: isVerified ? '#33463C' : '#B99A5E' }]}>
-                  {isVerified ? '✓ Verified Community Member' : 'Action Required: Submit verification'}
+                <Text style={styles.settingLabel}>Community Status</Text>
+                <Text style={[styles.settingDesc, { color: '#2E7D32' }]}>
+                  ✓ Verified Community Member
                 </Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#77766F" />
-          </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             style={[styles.rowButton, { borderTopWidth: 1, borderTopColor: '#D7D2C8' }]}

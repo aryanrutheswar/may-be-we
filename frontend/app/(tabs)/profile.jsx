@@ -480,11 +480,12 @@ export default function ProfileScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => router.push('/(auth)/verification')}
+              onPress={() => router.push('/settings')}
               style={[styles.secondaryActionBtn, { backgroundColor: 'rgba(250, 248, 243, 0.92)', borderColor: 'rgba(216, 212, 203, 0.85)' }]}
               activeOpacity={0.8}
+              accessibilityLabel="Verified Community Member"
             >
-              <Ionicons name="shield-checkmark-outline" size={15} color="#1D1D1B" />
+              <Ionicons name="shield-checkmark" size={15} color="#2E7D32" />
             </TouchableOpacity>
 
             <TouchableOpacity

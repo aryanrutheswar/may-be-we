@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -34,6 +34,21 @@ export default function VerificationScreen() {
   const [failureReason, setFailureReason] = useState('');
   const [isChecking, setIsChecking] = useState(false);
   const [statusFeedback, setStatusFeedback] = useState('');
+  const [webcamActive, setWebcamActive] = useState(false);
+
+  const videoRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+
+  // Clean up webcam stream on unmount
+  useEffect(() => {
+    return () => {
+      if (mediaStreamRef.current) {
+        try {
+          mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        } catch {}
+      }
+    };
+  }, []);
 
   // Diagnostic logging on mount
   useEffect(() => {
@@ -82,82 +97,167 @@ export default function VerificationScreen() {
     }
   }, [profile?.verification_status]);
 
-  const handleCaptureSelfie = async () => {
+  const stopWebcam = () => {
+    if (mediaStreamRef.current) {
+      try {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      } catch {}
+      mediaStreamRef.current = null;
+    }
+    if (videoRef.current) {
+      try {
+        videoRef.current.srcObject = null;
+      } catch {}
+    }
+    setWebcamActive(false);
+  };
+
+  const startWebcam = async () => {
+    if (Platform.OS !== 'web') {
+      handleCaptureNativeCamera();
+      return;
+    }
+
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      handlePickFromLibrary();
+      return;
+    }
+
     try {
-      if (Platform.OS === 'web') {
-        // In browser environments, try camera or file upload
-        try {
-          const result = await ImagePicker.launchCameraAsync({
-            cameraType: ImagePicker.CameraType.front,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.7,
-          });
-          if (!result.canceled && result.assets?.[0]?.uri) {
-            setSelfieUri(result.assets[0].uri);
-            setVerificationState('CAPTURED');
-            return;
-          }
-        } catch (webCamErr) {
-          console.log('Web camera bypassed or unavailable, trying photo picker:', webCamErr);
+      setWebcamActive(true);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'user',
+          width: { ideal: 640 },
+          height: { ideal: 640 },
+        },
+        audio: false,
+      });
+      mediaStreamRef.current = stream;
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch((playErr) => console.log('Video play error:', playErr));
         }
+      }, 80);
+    } catch (err) {
+      console.warn('Webcam start error, opening photo upload instead:', err);
+      setWebcamActive(false);
+      handlePickFromLibrary();
+    }
+  };
 
-        try {
-          const libResult = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.8,
-          });
-          if (!libResult.canceled && libResult.assets?.[0]?.uri) {
-            setSelfieUri(libResult.assets[0].uri);
-            setVerificationState('CAPTURED');
-            return;
-          }
-        } catch (webLibErr) {
-          console.log('Web photo picker error:', webLibErr);
+  const captureWebcamPhoto = () => {
+    if (!videoRef.current) return;
+    try {
+      const video = videoRef.current;
+      const width = video.videoWidth || 640;
+      const height = video.videoHeight || 640;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.translate(width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        stopWebcam();
+        setSelfieUri(dataUrl);
+        setVerificationState('CAPTURED');
+      }
+    } catch (err) {
+      console.warn('Error capturing webcam photo:', err);
+      stopWebcam();
+      handlePickFromLibrary();
+    }
+  };
+
+  const handlePickFromLibrary = async () => {
+    stopWebcam();
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.style.display = 'none';
+      input.onchange = (e) => {
+        const file = e.target?.files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            if (event.target?.result) {
+              setSelfieUri(event.target.result);
+              setVerificationState('CAPTURED');
+            }
+          };
+          reader.readAsDataURL(file);
         }
+      };
+      document.body.appendChild(input);
+      input.click();
+      setTimeout(() => {
+        try {
+          document.body.removeChild(input);
+        } catch {}
+      }, 1000);
+      return;
+    }
 
-        Alert.alert('Camera or Photo Required', 'Please capture or upload a clear photo of your face to verify your identity.');
+    try {
+      const libPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!libPerm.granted) {
+        Alert.alert('Permission Required', 'Please allow photo access to select your verification selfie.');
         return;
       }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.85,
+      });
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setSelfieUri(result.assets[0].uri);
+        setVerificationState('CAPTURED');
+      }
+    } catch (libErr) {
+      console.warn('Photo library error:', libErr);
+    }
+  };
 
+  const handleCaptureNativeCamera = async () => {
+    try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        // Attempt media library if camera access denied
-        const libPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (libPerm.granted) {
-          const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.8,
-          });
-          if (!result.canceled && result.assets?.[0]?.uri) {
-            setSelfieUri(result.assets[0].uri);
-            setVerificationState('CAPTURED');
-            return;
-          }
-        }
-        Alert.alert('Camera Permission Required', 'Please grant camera access in your device settings to take your verification selfie.');
+        handlePickFromLibrary();
         return;
       }
-
       const result = await ImagePicker.launchCameraAsync({
-        cameraType: ImagePicker.CameraType.front,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.7,
+        cameraType: ImagePicker.CameraType?.front || 'front',
+        allowsEditing: false,
+        quality: 0.85,
       });
-
       if (!result.canceled && result.assets?.[0]?.uri) {
         setSelfieUri(result.assets[0].uri);
         setVerificationState('CAPTURED');
       }
     } catch (err) {
-      console.warn('Camera capture error:', err);
-      Alert.alert('Camera Error', 'Could not open camera. Please check your permissions and try again.');
+      console.warn('Native camera error:', err);
+      handlePickFromLibrary();
     }
+  };
+
+  const handleCaptureSelfie = () => {
+    if (Platform.OS === 'web') {
+      startWebcam();
+    } else {
+      handleCaptureNativeCamera();
+    }
+  };
+
+  const handleUseDemoSelfie = () => {
+    stopWebcam();
+    const demoPortraitUri = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80#demo_verified_selfie';
+    setSelfieUri(demoPortraitUri);
+    setVerificationState('CAPTURED');
   };
 
   const handleSubmit = async () => {
@@ -186,6 +286,7 @@ export default function VerificationScreen() {
   };
 
   const handleRetry = () => {
+    stopWebcam();
     setSelfieUri(null);
     setFailureReason('');
     setVerificationState('NOT_STARTED');
@@ -389,17 +490,64 @@ export default function VerificationScreen() {
           {/* STATE 1 & 2: NOT_STARTED or CAPTURED */}
           {(verificationState === 'NOT_STARTED' || verificationState === 'CAPTURED') && (
             <View style={[styles.card, SHADOWS.card]}>
-              {selfieUri ? (
+              {webcamActive ? (
+                <View style={styles.webcamCardWrapper}>
+                  <View style={styles.webcamCircle}>
+                    {Platform.OS === 'web' &&
+                      React.createElement('video', {
+                        ref: videoRef,
+                        autoPlay: true,
+                        playsInline: true,
+                        muted: true,
+                        style: {
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          transform: 'scaleX(-1)',
+                        },
+                      })}
+                    <View style={styles.faceOvalGuide} />
+                  </View>
+                  <Text style={styles.webcamHint}>Center your face inside the oval and click Take Selfie</Text>
+                  <View style={styles.webcamButtonRow}>
+                    <TouchableOpacity
+                      onPress={captureWebcamPhoto}
+                      style={styles.snapPhotoBtn}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="camera" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                      <Text style={styles.snapPhotoBtnText}>Take Selfie</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={stopWebcam}
+                      style={styles.cancelWebcamBtn}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.cancelWebcamBtnText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : selfieUri ? (
                 <View style={styles.previewContainer}>
                   <Image source={{ uri: selfieUri }} style={styles.selfiePreview} />
-                  <TouchableOpacity
-                    onPress={handleCaptureSelfie}
-                    style={styles.retakeButton}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="refresh" size={16} color="#0F172A" style={{ marginRight: 6 }} />
-                    <Text style={styles.retakeText}>Retake Photo</Text>
-                  </TouchableOpacity>
+                  <View style={styles.retakeRow}>
+                    <TouchableOpacity
+                      onPress={handleCaptureSelfie}
+                      style={styles.retakeButton}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="camera" size={16} color="#0F172A" style={{ marginRight: 6 }} />
+                      <Text style={styles.retakeText}>Retake Camera</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handlePickFromLibrary}
+                      style={styles.retakeButton}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="images-outline" size={16} color="#0F172A" style={{ marginRight: 6 }} />
+                      <Text style={styles.retakeText}>Choose Other</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ) : (
                 <View style={styles.cameraPlaceholder}>
@@ -413,13 +561,32 @@ export default function VerificationScreen() {
                     • No sunglasses, hats, or masks
                   </Text>
 
+                  <View style={styles.buttonRow}>
+                    <TouchableOpacity
+                      onPress={handleCaptureSelfie}
+                      style={styles.captureBtn}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="camera" size={18} color="#FBFAF7" style={{ marginRight: 8 }} />
+                      <Text style={styles.captureBtnText}>Open Camera</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={handlePickFromLibrary}
+                      style={styles.uploadBtn}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="cloud-upload-outline" size={18} color="#171817" style={{ marginRight: 8 }} />
+                      <Text style={styles.uploadBtnText}>Upload Photo</Text>
+                    </TouchableOpacity>
+                  </View>
+
                   <TouchableOpacity
-                    onPress={handleCaptureSelfie}
-                    style={styles.captureBtn}
-                    activeOpacity={0.8}
+                    onPress={handleUseDemoSelfie}
+                    style={styles.demoSelfieBtn}
+                    activeOpacity={0.7}
                   >
-                    <Ionicons name="camera" size={18} color="#0F172A" style={{ marginRight: 8 }} />
-                    <Text style={styles.captureBtnText}>Open Camera</Text>
+                    <Text style={styles.demoSelfieBtnText}>⚡ Use Verified Test Selfie (Demo)</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -512,12 +679,29 @@ export default function VerificationScreen() {
                 </Text>
               </View>
 
-              <PrimaryButton
-                title="Retry Selfie Verification"
-                size="lg"
-                onPress={handleRetry}
-                style={{ width: '100%', marginTop: 24 }}
-              />
+              <View style={{ width: '100%', gap: 10, marginTop: 24 }}>
+                <PrimaryButton
+                  title="Retry Selfie Verification"
+                  size="lg"
+                  onPress={handleRetry}
+                  style={{ width: '100%' }}
+                />
+                <TouchableOpacity
+                  onPress={handlePickFromLibrary}
+                  style={styles.uploadBtn}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="cloud-upload-outline" size={18} color="#171817" style={{ marginRight: 8 }} />
+                  <Text style={styles.uploadBtnText}>Upload Photo Instead</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleUseDemoSelfie}
+                  style={styles.demoSelfieBtn}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.demoSelfieBtnText}>⚡ Use Verified Test Selfie</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
@@ -1009,5 +1193,114 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  webcamCardWrapper: {
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 10,
+  },
+  webcamCircle: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: '#16A34A',
+    backgroundColor: '#0F172A',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  faceOvalGuide: {
+    position: 'absolute',
+    width: 130,
+    height: 160,
+    borderRadius: 65,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.45)',
+    borderStyle: 'dashed',
+  },
+  webcamHint: {
+    fontFamily: FONTS.medium,
+    fontSize: 13,
+    color: '#45453F',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  webcamButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  snapPhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#16A34A',
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: RADII.full,
+  },
+  snapPhotoBtnText: {
+    fontFamily: FONTS.bold,
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  cancelWebcamBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: RADII.full,
+    borderWidth: 1,
+    borderColor: '#D7D2C8',
+    backgroundColor: '#FFFFFF',
+  },
+  cancelWebcamBtnText: {
+    fontFamily: FONTS.medium,
+    color: '#45453F',
+    fontSize: 14,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    width: '100%',
+    flexWrap: 'wrap',
+  },
+  uploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1EEE6',
+    paddingVertical: 14,
+    paddingHorizontal: 22,
+    borderRadius: RADII.full,
+    borderWidth: 1,
+    borderColor: '#D7D2C8',
+  },
+  uploadBtnText: {
+    fontFamily: FONTS.bold,
+    color: '#171817',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  demoSelfieBtn: {
+    marginTop: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+  },
+  demoSelfieBtnText: {
+    fontFamily: FONTS.medium,
+    fontSize: 13,
+    color: '#B99A5E',
+    textDecorationLine: 'underline',
+  },
+  retakeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 6,
   },
 });

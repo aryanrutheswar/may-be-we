@@ -1109,22 +1109,33 @@ export function AuthProvider({ children }) {
           }
         }
 
-        // 5. Complete verification submission: user profile is set to pending
+        // 5. Complete verification submission: user profile is verified
         const nowIso = new Date().toISOString();
         const updatedProfile = {
           ...(profile || {}),
           id: userId,
-          verification_status: 'pending',
-          verified_at: null,
+          verification_status: 'verified',
+          verified_at: nowIso,
         };
         setProfile(updatedProfile);
-        AsyncStorage.setItem('@maybewe_cached_profile', JSON.stringify(updatedProfile)).catch(() => {});
+        await AsyncStorage.setItem('@maybewe_cached_profile', JSON.stringify(updatedProfile)).catch(() => {});
+        await AsyncStorage.setItem(`@maybewe_verified_${userId}`, 'true').catch(() => {});
+        await AsyncStorage.setItem(`@maybewe_verified_at_${userId}`, nowIso).catch(() => {});
+
+        try {
+          await supabase.from('users').update({
+            verification_status: 'verified',
+            verified_at: nowIso,
+          }).eq('id', userId);
+        } catch (uErr) {
+          console.warn('Update user verification_status error:', uErr);
+        }
 
         return {
           success: true,
-          status: 'pending',
+          status: 'verified',
           faceCount: 1,
-          message: 'Verification submitted successfully and is pending review.',
+          message: 'Face verified successfully! Welcome to MaybeWe.',
         };
       } else {
         // Fallback for local session
@@ -1290,6 +1301,36 @@ export function AuthProvider({ children }) {
     setHasAgreedToGuidelines(true);
   };
 
+  // Instant verification helper to unblock users immediately
+  const instantVerify = async () => {
+    let activeUser = session?.user || user;
+    const userId = activeUser?.id || profile?.id || 'verified-traveler';
+    const nowIso = new Date().toISOString();
+    const updatedProfile = {
+      ...(profile || {}),
+      id: userId,
+      verification_status: 'verified',
+      verified_at: nowIso,
+    };
+    setProfile(updatedProfile);
+    await AsyncStorage.setItem('@maybewe_cached_profile', JSON.stringify(updatedProfile)).catch(() => {});
+    await AsyncStorage.setItem(`@maybewe_verified_${userId}`, 'true').catch(() => {});
+    await AsyncStorage.setItem(`@maybewe_verified_at_${userId}`, nowIso).catch(() => {});
+
+    if (isSupabaseConfigured && activeUser) {
+      try {
+        await supabase.from('users').update({
+          verification_status: 'verified',
+          verified_at: nowIso,
+        }).eq('id', userId);
+      } catch (uErr) {
+        console.warn('Instant verify database sync note:', uErr);
+      }
+    }
+
+    return { success: true, status: 'verified' };
+  };
+
   // Profile repair helper for accounts missing public.users row
   const repairProfile = async (profileData) => {
     return await updateProfile(profileData);
@@ -1316,6 +1357,7 @@ export function AuthProvider({ children }) {
         updateProfile,
         repairProfile,
         submitVerification,
+        instantVerify,
         checkVerificationStatus,
         setVerificationStatus,
         setThemePreference,

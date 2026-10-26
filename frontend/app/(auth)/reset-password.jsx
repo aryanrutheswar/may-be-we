@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../lib/authContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
@@ -20,7 +21,7 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
 export default function ResetPasswordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { session, logout, setIsPasswordRecovery } = useAuth();
+  const { session, logout, isPasswordRecovery, setIsPasswordRecovery, updateUserPassword } = useAuth();
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -33,6 +34,39 @@ export default function ResetPasswordScreen() {
   const [urlError, setUrlError] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
 
+  const confirmInputRef = useRef(null);
+
+  // Helper to extract authentication and error parameters from URL string (Web or Mobile deep link)
+  const extractParamsFromUrl = (urlString) => {
+    if (!urlString) return {};
+    try {
+      const url = new URL(urlString.replace('#', '?'));
+      return {
+        code: url.searchParams.get('code'),
+        accessToken: url.searchParams.get('access_token'),
+        refreshToken: url.searchParams.get('refresh_token'),
+        error: url.searchParams.get('error'),
+        errorDescription: url.searchParams.get('error_description'),
+        type: url.searchParams.get('type'),
+      };
+    } catch (_urlErr) {
+      const codeMatch = urlString.match(/[?&]code=([^&#]+)/);
+      const accessMatch = urlString.match(/[?&#]access_token=([^&#]+)/);
+      const refreshMatch = urlString.match(/[?&#]refresh_token=([^&#]+)/);
+      const errorMatch = urlString.match(/[?&#]error=([^&#]+)/);
+      const descMatch = urlString.match(/[?&#]error_description=([^&#]+)/);
+      const typeMatch = urlString.match(/[?&#]type=([^&#]+)/);
+      return {
+        code: codeMatch ? decodeURIComponent(codeMatch[1]) : null,
+        accessToken: accessMatch ? decodeURIComponent(accessMatch[1]) : null,
+        refreshToken: refreshMatch ? decodeURIComponent(refreshMatch[1]) : null,
+        error: errorMatch ? decodeURIComponent(errorMatch[1]) : null,
+        errorDescription: descMatch ? decodeURIComponent(descMatch[1]) : null,
+        type: typeMatch ? decodeURIComponent(typeMatch[1]) : null,
+      };
+    }
+  };
+
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       document.title = 'Set a new password — May Be We';
@@ -40,85 +74,85 @@ export default function ResetPasswordScreen() {
 
     let isMounted = true;
 
+    // Process parameters from deep link / URL
+    async function processIncomingUrl(urlString) {
+      if (!urlString) return false;
+      const { code, accessToken, refreshToken, error, errorDescription } = extractParamsFromUrl(urlString);
+      const parsedError = errorDescription || error;
+
+      if (parsedError) {
+        if (isMounted) {
+          setUrlError(
+            parsedError.toLowerCase().includes('expired')
+              ? 'This password reset link has expired. Please request a new one.'
+              : parsedError
+          );
+          setCheckingSession(false);
+        }
+        return true;
+      }
+
+      if (code && isSupabaseConfigured) {
+        try {
+          const { data: exData, error: exErr } =
+            await supabase.auth.exchangeCodeForSession(code);
+          if (!exErr && exData?.session) {
+            if (isMounted) {
+              setHasValidSession(true);
+              setIsPasswordRecovery(true);
+              setCheckingSession(false);
+            }
+            return true;
+          }
+        } catch (exchangeCatchErr) {
+          console.warn('PKCE code exchange error:', exchangeCatchErr);
+        }
+      }
+
+      if (accessToken && refreshToken && isSupabaseConfigured) {
+        try {
+          const { data: sData, error: sErr } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (!sErr && sData?.session) {
+            if (isMounted) {
+              setHasValidSession(true);
+              setIsPasswordRecovery(true);
+              setCheckingSession(false);
+            }
+            return true;
+          }
+        } catch (hashCatchErr) {
+          console.warn('Hash session parse error:', hashCatchErr);
+        }
+      }
+
+      return false;
+    }
+
     async function verifyRecoverySession() {
       try {
         setCheckingSession(true);
 
-        // Check for error parameters in URL on Web (e.g. expired link)
+        // 1. Check URL parameters for Web and Native cold-start deep links
+        let initialUrl = null;
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          const urlString = window.location.href;
-          let parsedError = null;
-
+          initialUrl = window.location.href;
+        } else {
           try {
-            const parsed = new URL(urlString.replace('#', '?'));
-            parsedError =
-              parsed.searchParams.get('error_description') ||
-              parsed.searchParams.get('error');
-          } catch {
-            const errorMatch =
-              urlString.match(/[?&#]error_description=([^&#]+)/) ||
-              urlString.match(/[?&#]error=([^&#]+)/);
-            if (errorMatch) parsedError = decodeURIComponent(errorMatch[1]);
-          }
-
-          if (parsedError) {
-            if (isMounted) {
-              setUrlError(
-                parsedError.includes('expired')
-                  ? 'This password reset link has expired. Please request a new one.'
-                  : parsedError
-              );
-              setCheckingSession(false);
-            }
-            return;
-          }
-
-          // Check if there is a PKCE code or access_token in the URL to exchange
-          const searchParams = new URLSearchParams(window.location.search);
-          const hash = window.location.hash || '';
-          const code = searchParams.get('code');
-
-          if (code && isSupabaseConfigured) {
-            try {
-              const { data: exData, error: exErr } =
-                await supabase.auth.exchangeCodeForSession(code);
-              if (!exErr && exData?.session) {
-                if (isMounted) {
-                  setHasValidSession(true);
-                  setIsPasswordRecovery(true);
-                  setCheckingSession(false);
-                }
-                return;
-              }
-            } catch (exchangeCatchErr) {
-              console.warn('PKCE code exchange error:', exchangeCatchErr);
-            }
-          } else if (hash.includes('access_token') && isSupabaseConfigured) {
-            try {
-              const hashParams = new URLSearchParams(hash.replace(/^#/, ''));
-              const accessToken = hashParams.get('access_token');
-              const refreshToken = hashParams.get('refresh_token');
-              if (accessToken && refreshToken) {
-                const { data: sData, error: sErr } = await supabase.auth.setSession({
-                  access_token: accessToken,
-                  refresh_token: refreshToken,
-                });
-                if (!sErr && sData?.session) {
-                  if (isMounted) {
-                    setHasValidSession(true);
-                    setIsPasswordRecovery(true);
-                    setCheckingSession(false);
-                  }
-                  return;
-                }
-              }
-            } catch (hashCatchErr) {
-              console.warn('Hash session parse error:', hashCatchErr);
-            }
+            initialUrl = await Linking.getInitialURL();
+          } catch (linkErr) {
+            console.warn('Linking.getInitialURL error:', linkErr);
           }
         }
 
-        // Verify active Supabase session
+        if (initialUrl) {
+          const handled = await processIncomingUrl(initialUrl);
+          if (handled) return;
+        }
+
+        // 2. Verify active Supabase session
         if (isSupabaseConfigured) {
           const {
             data: { session: currentSession },
@@ -150,26 +184,42 @@ export default function ResetPasswordScreen() {
 
     verifyRecoverySession();
 
+    // 3. Listen for incoming deep links while mounted (Native iOS/Android background-to-foreground)
+    const linkingSub = Linking.addEventListener('url', (event) => {
+      if (event?.url && isMounted) {
+        processIncomingUrl(event.url);
+      }
+    });
+
     return () => {
       isMounted = false;
+      linkingSub?.remove?.();
     };
   }, []);
 
   const handleUpdatePassword = async () => {
-    const trimmedPassword = newPassword.trim();
-    const trimmedConfirm = confirmPassword.trim();
-
-    if (!trimmedPassword) {
+    // Prevent accidental silent modification while validating input hygiene
+    if (!newPassword) {
       setErrorMessage('Please enter your new password.');
       return;
     }
 
-    if (trimmedPassword.length < 8) {
+    if (newPassword.startsWith(' ') || newPassword.endsWith(' ')) {
+      setErrorMessage('Password cannot begin or end with whitespace.');
+      return;
+    }
+
+    if (newPassword.length < 8) {
       setErrorMessage('Password must be at least 8 characters.');
       return;
     }
 
-    if (trimmedPassword !== trimmedConfirm) {
+    if (confirmPassword.startsWith(' ') || confirmPassword.endsWith(' ')) {
+      setErrorMessage('Confirmation password cannot begin or end with whitespace.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
       setErrorMessage('Both passwords must match.');
       return;
     }
@@ -179,13 +229,22 @@ export default function ResetPasswordScreen() {
 
     try {
       if (isSupabaseConfigured) {
-        const { error } = await supabase.auth.updateUser({
-          password: trimmedPassword,
-        });
+        // Use central AuthContext updateUserPassword helper
+        if (updateUserPassword) {
+          const result = await updateUserPassword(newPassword);
+          if (!result.success) {
+            setErrorMessage(result.error || 'Failed to update password. Please try again.');
+            return;
+          }
+        } else {
+          const { error } = await supabase.auth.updateUser({
+            password: newPassword,
+          });
 
-        if (error) {
-          setErrorMessage(error.message || 'Failed to update password. Please try again.');
-          return;
+          if (error) {
+            setErrorMessage(error.message || 'Failed to update password. Please try again.');
+            return;
+          }
         }
 
         setIsSuccess(true);
@@ -203,10 +262,11 @@ export default function ResetPasswordScreen() {
 
   const handleNavigateToLogin = async () => {
     try {
+      // Invalidate recovery session so user signs in cleanly (OWASP ASVS 2.1.9)
       if (logout) {
         await logout();
       }
-    } catch {}
+    } catch (_logoutErr) {}
     setIsPasswordRecovery(false);
     router.replace('/(auth)/login');
   };
@@ -214,6 +274,9 @@ export default function ResetPasswordScreen() {
   const handleRequestNewLink = () => {
     router.replace('/(auth)/forgot-password');
   };
+
+  const passwordsMatch = confirmPassword.length > 0 && newPassword === confirmPassword;
+  const passwordsMismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
 
   return (
     <KeyboardAvoidingView
@@ -316,11 +379,15 @@ export default function ResetPasswordScreen() {
                     autoCapitalize="none"
                     autoCorrect={false}
                     returnKeyType="next"
+                    onSubmitEditing={() => confirmInputRef.current?.focus()}
+                    accessibilityLabel="New password"
                   />
                   <TouchableOpacity
                     style={styles.visibilityToggle}
                     onPress={() => setShowPassword(!showPassword)}
+                    accessibilityRole="button"
                     accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <Ionicons
                       name={showPassword ? 'eye-off-outline' : 'eye-outline'}
@@ -336,6 +403,7 @@ export default function ResetPasswordScreen() {
                 <Text style={styles.fieldLabel}>Confirm new password</Text>
                 <View style={styles.inputContainer}>
                   <TextInput
+                    ref={confirmInputRef}
                     style={styles.input}
                     placeholder="Type it again"
                     placeholderTextColor="#9CA3AF"
@@ -349,11 +417,14 @@ export default function ResetPasswordScreen() {
                     autoCorrect={false}
                     returnKeyType="done"
                     onSubmitEditing={handleUpdatePassword}
+                    accessibilityLabel="Confirm new password"
                   />
                   <TouchableOpacity
                     style={styles.visibilityToggle}
                     onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                    accessibilityRole="button"
                     accessibilityLabel={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <Ionicons
                       name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
@@ -362,7 +433,15 @@ export default function ResetPasswordScreen() {
                     />
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.helperText}>Both passwords must match.</Text>
+
+                {/* Real-time Match Feedback */}
+                {passwordsMatch ? (
+                  <Text style={styles.helperTextMatch}>✓ Passwords match</Text>
+                ) : passwordsMismatch ? (
+                  <Text style={styles.helperTextMismatch}>Passwords do not match yet</Text>
+                ) : (
+                  <Text style={styles.helperText}>Both passwords must match.</Text>
+                )}
               </View>
 
               {/* Inline Error Message */}
@@ -502,6 +581,17 @@ const styles = StyleSheet.create({
   helperText: {
     fontSize: 13,
     color: '#6B7280',
+    marginTop: 6,
+  },
+  helperTextMatch: {
+    fontSize: 13,
+    color: '#16A34A',
+    fontWeight: '500',
+    marginTop: 6,
+  },
+  helperTextMismatch: {
+    fontSize: 13,
+    color: '#DC2626',
     marginTop: 6,
   },
   errorAlert: {

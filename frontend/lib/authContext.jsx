@@ -382,7 +382,7 @@ export function AuthProvider({ children }) {
       } else {
         return {
           success: false,
-          error: 'Supabase authentication is not configured. Real Supabase connection required.',
+          error: 'Supabase authentication is not configured. Please verify your Supabase URL and Publishable Key in .env.',
         };
       }
     } catch (error) {
@@ -410,18 +410,10 @@ export function AuthProvider({ children }) {
     setIsLoading(true);
     try {
       if (!isSupabaseConfigured) {
-        // Fallback for offline / demo environment
-        const demoGoogleUser = {
-          ...DEMO_CURRENT_USER,
-          id: 'google-demo-user',
-          name: 'Priya Sharma',
-          email: 'priya.sharma@gmail.com',
+        return {
+          success: false,
+          error: 'Supabase authentication is not configured. Please verify your Supabase URL and Publishable Key in .env.',
         };
-        await AsyncStorage.setItem(DEMO_AUTH_KEY, 'true');
-        await AsyncStorage.setItem(DEMO_PROFILE_KEY, JSON.stringify(demoGoogleUser));
-        setProfile(demoGoogleUser);
-        setIsDemoMode(true);
-        return { success: true, isDemo: true };
       }
 
       if (Platform.OS === 'web') {
@@ -578,7 +570,7 @@ export function AuthProvider({ children }) {
       } else {
         return {
           success: false,
-          error: 'Supabase authentication is not configured. Real Supabase connection required.',
+          error: 'Supabase authentication is not configured. Please verify your Supabase URL and Publishable Key in .env.',
         };
       }
     } catch (error) {
@@ -620,44 +612,19 @@ export function AuthProvider({ children }) {
         throw new Error('You must be at least 18 years old to join MaybeWe.');
       }
 
-      if (isSupabaseConfigured) {
-        console.log('[Auth] Attempting signUp for:', userData.email);
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: userData.email,
-          password: userData.password,
-          options: {
-            data: {
-              name: userData.name,
-              age: ageNum,
-              gender: userData.gender || 'Not specified',
-              bio: userData.bio || '',
-              avatar_url: userData.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
-              travel_styles: userData.travel_styles || [],
-              languages: userData.languages || ['English'],
-            },
-          },
-        });
+      if (!isSupabaseConfigured) {
+        return {
+          success: false,
+          error: 'Supabase authentication is not configured. Please verify your Supabase URL and Publishable Key in .env.',
+        };
+      }
 
-        console.log('[Auth] signUp result:', {
-          hasUser: !!authData?.user,
-          hasSession: !!authData?.session,
-          userId: authData?.user?.id || 'NONE',
-          error: authError?.message || null,
-        });
-
-        if (authError) throw authError;
-
-        if (authData.user) {
-          // Confirm Email is OFF for development: require the returned session before attempting the authenticated upsert
-          if (!authData.session) {
-            return {
-              success: false,
-              error: 'Signup requires email confirmation before profile creation can proceed.',
-            };
-          }
-
-          const profilePayload = {
-            id: authData.user.id,
+      console.log('[Auth] Attempting signUp for:', userData.email);
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+        options: {
+          data: {
             name: userData.name,
             age: ageNum,
             gender: userData.gender || 'Not specified',
@@ -665,64 +632,74 @@ export function AuthProvider({ children }) {
             avatar_url: userData.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
             travel_styles: userData.travel_styles || [],
             languages: userData.languages || ['English'],
-            verification_status: 'verified',
-            verified_at: new Date().toISOString(),
-            trust_score: 5.00,
-            subscription_tier: 'free',
-            theme_preference: 'light',
-          };
+          },
+        },
+      });
 
-          const { error: profileError } = await supabase
-            .from('users')
-            .upsert([profilePayload], { onConflict: 'id' });
+      console.log('[Auth] signUp result:', {
+        hasUser: !!authData?.user,
+        hasSession: !!authData?.session,
+        userId: authData?.user?.id || 'NONE',
+        error: authError?.message || null,
+      });
 
-          if (profileError) {
-            console.warn('Profile creation error during signup:', profileError);
-            return {
-              success: false,
-              error: `Profile creation failed: ${profileError.message || 'Database error'}.`,
-            };
-          }
+      if (authError) throw authError;
 
-          await AsyncStorage.multiRemove([DEMO_AUTH_KEY, DEMO_PROFILE_KEY, '@maybewe_cached_profile', GUIDELINES_KEY]);
-          setHasAgreedToGuidelines(false);
-          setProfile({ ...profilePayload, email: userData.email });
-          setSession(authData.session);
-          setIsDemoMode(false);
-        } else {
+      if (authData?.user) {
+        // If Supabase has "Confirm email" enabled, authData.user is returned but session is null until verified
+        if (!authData.session) {
           return {
-            success: false,
-            error: 'User registration failed to establish session credentials.',
+            success: true,
+            needsEmailConfirmation: true,
+            message: 'Account created! Please check your email to confirm your account before signing in.',
           };
         }
-        return { success: true, session: authData.session, user: authData.user };
-      } else {
-        // Demo signup: start strictly as unverified (not_started)
-        const newProfile = {
-          id: `user-${Date.now()}`,
-          name: userData.name || 'Solo Explorer',
-          email: userData.email || 'explorer@traveler.io',
+
+        const profilePayload = {
+          id: authData.user.id,
+          name: userData.name,
           age: ageNum,
           gender: userData.gender || 'Not specified',
-          bio: userData.bio || 'Eager to discover hidden corners and friendly travel companions.',
+          bio: userData.bio || '',
           avatar_url: userData.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
-          travel_styles: userData.travel_styles || ['Culture', 'Adventure'],
+          travel_styles: userData.travel_styles || [],
           languages: userData.languages || ['English'],
           verification_status: 'verified',
           verified_at: new Date().toISOString(),
           trust_score: 5.00,
           subscription_tier: 'free',
           theme_preference: 'light',
-          created_at: new Date().toISOString(),
         };
 
-        await AsyncStorage.setItem(DEMO_AUTH_KEY, 'true');
-        await AsyncStorage.setItem(DEMO_PROFILE_KEY, JSON.stringify(newProfile));
-        await AsyncStorage.removeItem(GUIDELINES_KEY);
+        const { error: profileError } = await supabase
+          .from('users')
+          .upsert([profilePayload], { onConflict: 'id' });
+
+        if (profileError) {
+          console.warn('Profile creation error during signup:', profileError);
+          if (profileError.code === 'PGRST205' || profileError.message?.includes('schema cache')) {
+            return {
+              success: false,
+              error: "Database schema incomplete: 'public.users' table not found in Supabase. Please execute the SQL migration in your Supabase dashboard SQL Editor.",
+            };
+          }
+          return {
+            success: false,
+            error: `Profile creation failed: ${profileError.message || 'Database error'}.`,
+          };
+        }
+
+        await AsyncStorage.multiRemove([DEMO_AUTH_KEY, DEMO_PROFILE_KEY, '@maybewe_cached_profile', GUIDELINES_KEY]);
         setHasAgreedToGuidelines(false);
-        setProfile(newProfile);
-        setIsDemoMode(true);
-        return { success: true };
+        setProfile({ ...profilePayload, email: userData.email });
+        setSession(authData.session);
+        setIsDemoMode(false);
+        return { success: true, session: authData.session, user: authData.user };
+      } else {
+        return {
+          success: false,
+          error: 'User registration failed to establish session credentials.',
+        };
       }
     } catch (error) {
       console.warn('Signup error:', error.message);

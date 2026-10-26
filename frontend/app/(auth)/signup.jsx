@@ -214,7 +214,20 @@ export default function SignupScreen() {
     setLoading(false);
 
     if (res.success) {
-      router.push('/(auth)/guidelines');
+      if (res.needsEmailConfirmation) {
+        Alert.alert(
+          'Confirm Your Email',
+          res.message || 'Account created! Please check your email inbox to confirm your address before signing in.',
+          [
+            {
+              text: 'Go to Sign In',
+              onPress: () => router.replace('/(auth)/login'),
+            },
+          ]
+        );
+      } else {
+        router.push('/(auth)/guidelines');
+      }
     } else {
       setErrorMsg(res.error || 'Failed to create account. Please try again.');
     }

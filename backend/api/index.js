@@ -21,7 +21,7 @@ module.exports = function handler(req, res) {
         validateSelfie: '/api/validate-selfie',
       },
       supabase: {
-        url: process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://vdmzchvwrmqnbmpzvgng.supabase.co',
+        url: process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://mfiyfntjgkmljiaeufsx.supabase.co',
         connected: true,
       },
       timestamp: new Date().toISOString(),

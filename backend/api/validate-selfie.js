@@ -26,12 +26,13 @@ module.exports = async function handler(req, res) {
     const supabaseUrl =
       process.env.SUPABASE_URL ||
       process.env.EXPO_PUBLIC_SUPABASE_URL ||
-      'https://vdmzchvwrmqnbmpzvgng.supabase.co';
+      'https://mfiyfntjgkmljiaeufsx.supabase.co';
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const anonKey =
       process.env.SUPABASE_ANON_KEY ||
       process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-      'sb_publishable_u7pO7cAzSDoZkbDLfbKbOw_Bmkt1Fsh';
+      process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      'sb_publishable_CcSZ3gVWBYXYspb40svgAg_9e_aR068';
 
     // Verify authenticated user
     const userClient = createClient(supabaseUrl, anonKey || serviceRoleKey, {

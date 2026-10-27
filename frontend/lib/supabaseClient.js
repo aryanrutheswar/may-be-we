@@ -1,15 +1,19 @@
 import safeStorage from './safeStorage.js';
 import { createClient } from '@supabase/supabase-js';
 
+// Configured Supabase project defaults for MaybeWe
+const DEFAULT_SUPABASE_URL = 'https://mfiyfntjgkmljiaeufsx.supabase.co';
+const DEFAULT_SUPABASE_KEY = 'sb_publishable_CcSZ3gVWBYXYspb40svgAg_9e_aR068';
+
 // Resolve Supabase project URL supporting Expo, Vite, Next.js, and standard process.env
 const rawSupabaseUrl =
   process.env.EXPO_PUBLIC_SUPABASE_URL ||
   process.env.VITE_SUPABASE_URL ||
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
   process.env.SUPABASE_URL ||
-  '';
+  DEFAULT_SUPABASE_URL;
 
-export const supabaseUrl = rawSupabaseUrl
+export const supabaseUrl = (rawSupabaseUrl || DEFAULT_SUPABASE_URL)
   .replace(/\/rest\/v1\/?$/i, '')
   .replace(/\/+$/, '');
 
@@ -23,7 +27,7 @@ export const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   process.env.SUPABASE_PUBLISHABLE_KEY ||
   process.env.SUPABASE_ANON_KEY ||
-  '';
+  DEFAULT_SUPABASE_KEY;
 
 // Configuration check: validates URL and key presence without placeholder strings
 export const isSupabaseConfigured = Boolean(

@@ -15,7 +15,7 @@ module.exports = function handler(req, res) {
     version: '1.0.0',
     platform: 'Vercel Serverless',
     supabase: {
-      url: process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://vdmzchvwrmqnbmpzvgng.supabase.co',
+      url: process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://mfiyfntjgkmljiaeufsx.supabase.co',
       connected: true,
     },
   });
